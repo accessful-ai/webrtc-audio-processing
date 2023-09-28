@@ -13,49 +13,6 @@ fn out_dir() -> PathBuf {
     std::env::var("OUT_DIR").expect("OUT_DIR environment var not set.").into()
 }
 
-#[cfg(not(feature = "bundled"))]
-mod webrtc {
-    use super::*;
-    use failure::bail;
-
-    const LIB_NAME: &str = "webrtc-audio-processing";
-
-    pub(super) fn get_build_paths() -> Result<(PathBuf, PathBuf), Error> {
-        let (pkgconfig_include_path, pkgconfig_lib_path) = find_pkgconfig_paths()?;
-
-        let include_path = std::env::var("WEBRTC_AUDIO_PROCESSING_INCLUDE")
-            .ok()
-            .map(|x| x.into())
-            .or(pkgconfig_include_path);
-        let lib_path = std::env::var("WEBRTC_AUDIO_PROCESSING_LIB")
-            .ok()
-            .map(|x| x.into())
-            .or(pkgconfig_lib_path);
-
-        println!("{:?}, {:?}", include_path, lib_path);
-
-        match (include_path, lib_path) {
-            (Some(include_path), Some(lib_path)) => Ok((include_path, lib_path)),
-            _ => {
-                eprintln!("Couldn't find either header or lib files for {}.", LIB_NAME);
-                eprintln!("See the crate README for installation instructions, or use the 'bundled' feature to statically compile.");
-                bail!("Aborting compilation due to linker failure.");
-            },
-        }
-    }
-
-    pub(super) fn build_if_necessary() -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn find_pkgconfig_paths() -> Result<(Option<PathBuf>, Option<PathBuf>), Error> {
-        Ok(pkg_config::Config::new()
-            .probe(LIB_NAME)
-            .and_then(|mut lib| Ok((lib.include_paths.pop(), lib.link_paths.pop())))?)
-    }
-}
-
-#[cfg(feature = "bundled")]
 mod webrtc {
     use super::*;
     use failure::bail;
@@ -194,11 +151,7 @@ fn main() -> Result<(), Error> {
 
     println!("cargo:rerun-if-env-changed={}", DEPLOYMENT_TARGET_VAR);
 
-    if cfg!(feature = "bundled") {
-        println!("cargo:rustc-link-lib=static=webrtc_audio_processing");
-    } else {
-        println!("cargo:rustc-link-lib=dylib=webrtc_audio_processing");
-    }
+    println!("cargo:rustc-link-lib=static=webrtc_audio_processing");
 
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=dylib=c++");

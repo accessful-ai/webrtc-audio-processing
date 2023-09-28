@@ -8,6 +8,9 @@
 #define WEBRTC_POSIX
 #define WEBRTC_AUDIO_PROCESSING_ONLY_BUILD
 
+#include "webrtc/base/scoped_ptr.h"
+#include "webrtc/typedefs.h"
+#include <webrtc/common_audio/vad/include/vad.h>
 #include <webrtc/modules/audio_processing/include/audio_processing.h>
 #include <webrtc/modules/interface/module_common_types.h>
 
@@ -38,7 +41,7 @@ OptionalBool make_optional_bool(const bool value) {
   return rv;
 }
 
-}  // namespace
+} // namespace
 
 struct AudioProcessing {
   std::unique_ptr<webrtc::AudioProcessing> processor;
@@ -47,9 +50,8 @@ struct AudioProcessing {
   OptionalInt stream_delay_ms;
 };
 
-AudioProcessing* audio_processing_create(
-    const InitializationConfig& init_config,
-    int* error) {
+AudioProcessing *
+audio_processing_create(const InitializationConfig &init_config, int *error) {
   webrtc::Config config;
   if (init_config.enable_experimental_agc) {
     config.Set<webrtc::ExperimentalAgc>(
@@ -61,7 +63,7 @@ AudioProcessing* audio_processing_create(
   // TODO(ryo): Experiment with the webrtc's builtin beamformer. There are some
   // preconditions; see |ec_fixate_spec()| in the pulseaudio's example.
 
-  AudioProcessing* ap = new AudioProcessing;
+  AudioProcessing *ap = new AudioProcessing;
   ap->processor.reset(webrtc::AudioProcessing::Create(config));
 
   const bool has_keyboard = false;
@@ -71,10 +73,10 @@ AudioProcessing* audio_processing_create(
       SAMPLE_RATE_HZ, init_config.num_render_channels, has_keyboard);
 
   webrtc::ProcessingConfig pconfig = {
-    ap->capture_stream_config,
-    ap->capture_stream_config,
-    ap->render_stream_config,
-    ap->render_stream_config,
+      ap->capture_stream_config,
+      ap->capture_stream_config,
+      ap->render_stream_config,
+      ap->render_stream_config,
   };
   const int code = ap->processor->Initialize(pconfig);
   if (code != webrtc::AudioProcessing::kNoError) {
@@ -86,25 +88,25 @@ AudioProcessing* audio_processing_create(
   return ap;
 }
 
-int process_capture_frame(AudioProcessing* ap, float** channels) {
-  auto* p = ap->processor.get();
+int process_capture_frame(AudioProcessing *ap, float **channels) {
+  auto *p = ap->processor.get();
 
   if (p->echo_cancellation()->is_enabled()) {
     p->set_stream_delay_ms(
         ap->stream_delay_ms.has_value ? ap->stream_delay_ms.value : 0);
   }
 
-  return p->ProcessStream(
-      channels, ap->capture_stream_config, ap->capture_stream_config, channels);
+  return p->ProcessStream(channels, ap->capture_stream_config,
+                          ap->capture_stream_config, channels);
 }
 
-int process_render_frame(AudioProcessing* ap, float** channels) {
+int process_render_frame(AudioProcessing *ap, float **channels) {
   return ap->processor->ProcessReverseStream(
       channels, ap->render_stream_config, ap->render_stream_config, channels);
 }
 
-Stats get_stats(AudioProcessing* ap) {
-  auto* p = ap->processor.get();
+Stats get_stats(AudioProcessing *ap) {
+  auto *p = ap->processor.get();
 
   Stats stats;
   if (p->voice_detection()->is_enabled()) {
@@ -119,8 +121,8 @@ Stats get_stats(AudioProcessing* ap) {
     stats.rms_dbfs = make_optional_int(-1 * p->level_estimator()->RMS());
   }
   if (p->noise_suppression()->is_enabled()) {
-    if (p->noise_suppression()->speech_probability()
-        != webrtc::AudioProcessing::kUnsupportedFunctionError) {
+    if (p->noise_suppression()->speech_probability() !=
+        webrtc::AudioProcessing::kUnsupportedFunctionError) {
       stats.speech_probability =
           make_optional_double(p->noise_suppression()->speech_probability());
     }
@@ -132,8 +134,8 @@ Stats get_stats(AudioProcessing* ap) {
   // latest master.
   if (p->echo_cancellation()->is_enabled()) {
     webrtc::EchoCancellation::Metrics metrics;
-    if (p->echo_cancellation()->GetMetrics(&metrics)
-        == webrtc::AudioProcessing::kNoError) {
+    if (p->echo_cancellation()->GetMetrics(&metrics) ==
+        webrtc::AudioProcessing::kNoError) {
       stats.residual_echo_return_loss =
           make_optional_double(metrics.residual_echo_return_loss.instant);
       stats.echo_return_loss =
@@ -147,8 +149,8 @@ Stats get_stats(AudioProcessing* ap) {
     int delay_stddev_ms = -1;
     float fraction_poor_delays = -1;
     if (p->echo_cancellation()->GetDelayMetrics(
-            &delay_median_ms, &delay_stddev_ms, &fraction_poor_delays)
-        == webrtc::AudioProcessing::kNoError) {
+            &delay_median_ms, &delay_stddev_ms, &fraction_poor_delays) ==
+        webrtc::AudioProcessing::kNoError) {
       stats.delay_median_ms = make_optional_int(delay_median_ms);
       stats.delay_standard_deviation_ms = make_optional_int(delay_stddev_ms);
       stats.delay_fraction_poor_delays =
@@ -159,17 +161,15 @@ Stats get_stats(AudioProcessing* ap) {
   return stats;
 }
 
-void set_config(AudioProcessing* ap, const Config& config) {
-  auto* p = ap->processor.get();
+void set_config(AudioProcessing *ap, const Config &config) {
+  auto *p = ap->processor.get();
 
   webrtc::Config extra_config;
-  extra_config.Set<webrtc::ExtendedFilter>(
-      new webrtc::ExtendedFilter(
-        config.echo_cancellation.enable_extended_filter));
-  extra_config.Set<webrtc::DelayAgnostic>(
-      new webrtc::DelayAgnostic(
-        !config.echo_cancellation.stream_delay_ms.has_value &&
-        config.echo_cancellation.enable_delay_agnostic));
+  extra_config.Set<webrtc::ExtendedFilter>(new webrtc::ExtendedFilter(
+      config.echo_cancellation.enable_extended_filter));
+  extra_config.Set<webrtc::DelayAgnostic>(new webrtc::DelayAgnostic(
+      !config.echo_cancellation.stream_delay_ms.has_value &&
+      config.echo_cancellation.enable_delay_agnostic));
   extra_config.Set<webrtc::ExperimentalNs>(
       new webrtc::ExperimentalNs(config.enable_transient_suppressor));
   // TODO(ryo): There is a new RefinedAdaptiveFilter in the latest master.
@@ -229,16 +229,32 @@ void set_config(AudioProcessing* ap, const Config& config) {
   p->level_estimator()->Enable(true);
 }
 
-void set_output_will_be_muted(AudioProcessing* ap, bool muted) {
+void set_output_will_be_muted(AudioProcessing *ap, bool muted) {
   ap->processor->set_output_will_be_muted(muted);
 }
 
-void audio_processing_delete(AudioProcessing* ap) {
-  delete ap;
-}
+void audio_processing_delete(AudioProcessing *ap) { delete ap; }
 
 bool is_success(const int code) {
   return code == webrtc::AudioProcessing::kNoError;
 }
 
-}  // namespace webrtc_audio_processing
+struct FVad {
+  rtc::scoped_ptr<webrtc::Vad> vad;
+  int sample_rate;
+};
+
+FVad *fvad_create(Aggressiveness aggressiveness) {
+  return new FVad{
+    vad : webrtc::CreateVad(webrtc::Vad::Aggressiveness(aggressiveness)),
+    sample_rate : 16000
+  };
+}
+
+int fvad_process(FVad *fvad, const int16_t *audio, size_t num_samples) {
+  return fvad->vad->VoiceActivity(audio, num_samples, fvad->sample_rate);
+}
+
+void fvad_delete(FVad *fvad) { delete fvad; }
+
+} // namespace webrtc_audio_processing

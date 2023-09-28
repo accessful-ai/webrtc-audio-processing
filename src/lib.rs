@@ -163,6 +163,87 @@ impl Processor {
     }
 }
 
+/// The VadMode to use in the Vad struct
+pub enum VadMode {
+    /// Quality mode.
+    Quality = 0,
+    /// Low bitrate mode.
+    LowBitrate = 1,
+    /// Aggressive mode.
+    Aggressive = 2,
+    /// Very aggressive mode.
+    VeryAggressive = 3,
+}
+
+/// The object that allows us to check if a segment has voice
+pub struct Vad {
+    fvad: *mut ffi::FVad,
+}
+
+impl Vad {
+    /// Creates and initializes a VAD instance.
+    ///
+    /// Panics in case of a memory allocation error.
+    ///
+    /// Defaults to `8kHz` sample rate and `Quality` mode.
+    pub fn new() -> Self {
+        Self::new_with_mode(VadMode::Quality)
+    }
+
+    /// Creates and initializes a VAD instance.
+    ///
+    /// Panics in case of a memory allocation error.
+    ///
+    /// Defaults to `8kHz` sample rate.
+    pub fn new_with_mode(mode: VadMode) -> Self {
+        let aggressiveness = match mode {
+            VadMode::Quality => ffi::Aggressiveness::kVadNormal,
+            VadMode::LowBitrate => ffi::Aggressiveness::kVadLowBitrate,
+            VadMode::Aggressive => ffi::Aggressiveness::kVadAggressive,
+            VadMode::VeryAggressive => ffi::Aggressiveness::kVadVeryAggressive,
+        };
+        let fvad = unsafe { ffi::fvad_create(aggressiveness) };
+        Self { fvad }
+    }
+
+    /// Calculates a VAD decision for an audio frame.
+    ///
+    /// `buffer` is a slice of signed 16-bit samples. Only slices with a
+    /// length of 10, 20 or 30 ms are supported, so for example at 8 kHz, `buffer.len()`
+    /// must be either 80, 160 or 240.
+    ///
+    /// Returns              : Ok(true) - (active voice),
+    ///                       Ok(false) - (non-active Voice),
+    ///                       Err(()) - (invalid frame length).
+    pub fn is_voice_segment(&self, buffer: &[i16]) -> Result<bool, ()> {
+        let b = &buffer[0] as *const i16;
+
+        unsafe {
+            match ffi::fvad_process(self.fvad, b, buffer.len()) {
+                1 => Ok(true),
+                0 => Ok(false),
+                _ => Err(()),
+            }
+        }
+    }
+}
+
+impl Drop for Vad {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::fvad_delete(self.fvad);
+        }
+    }
+}
+
+impl Default for Vad {
+    fn default() -> Self {
+        Vad::new()
+    }
+}
+
+unsafe impl Send for Vad {}
+
 /// Minimal wrapper for safe and synchronized ffi.
 struct AudioProcessing {
     inner: *mut ffi::AudioProcessing,
@@ -289,6 +370,14 @@ mod tests {
         }
 
         (render_frame, capture_frame)
+    }
+
+    #[test]
+    fn test_vad() {
+        let vad = Vad::new();
+        let frame: [i16; 160] = [0; 160];
+        let res = vad.is_voice_segment(&frame).unwrap();
+        assert_eq!(res, false);
     }
 
     #[test]

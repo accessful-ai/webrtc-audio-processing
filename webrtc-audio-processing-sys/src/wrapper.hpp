@@ -4,6 +4,9 @@
 #ifndef WEBRTC_AUDIO_PROCESSING_WRAPPER_HPP_
 #define WEBRTC_AUDIO_PROCESSING_WRAPPER_HPP_
 
+#include <stddef.h>
+#include <stdint.h>
+
 namespace webrtc_audio_processing {
 
 // AudioProcessing accepts only one of 48000, 32000, 16000, and 8000 hz.
@@ -33,12 +36,14 @@ struct OptionalBool {
   bool value = false;
 };
 
-/// <div rustbindgen>A configuration used only when initializing a Processor.</div>
+/// <div rustbindgen>A configuration used only when initializing a
+/// Processor.</div>
 struct InitializationConfig {
   int num_capture_channels;
   int num_render_channels;
 
-  // TODO: Investigate how it's different from the default gain control and the effect of using the two at the same time.
+  // TODO: Investigate how it's different from the default gain control and the
+  // effect of using the two at the same time.
   bool enable_experimental_agc;
 
   bool enable_intelligibility_enhancer;
@@ -51,11 +56,11 @@ struct EchoCancellation {
 
   /// <div rustbindgen>A level of echo suppression.</div>
   enum SuppressionLevel {
-      LOWEST,
-      LOWER,
-      LOW,
-      MODERATE,
-      HIGH,
+    LOWEST,
+    LOWER,
+    LOW,
+    MODERATE,
+    HIGH,
   };
 
   /// <div rustbindgen>
@@ -73,9 +78,9 @@ struct EchoCancellation {
   bool enable_extended_filter;
 
   /// <div rustbindgen>
-  /// Enables delay-agnostic echo cancellation. This feature relies on internally
-  /// estimated delays between the process and reverse streams, thus not relying
-  /// on reported system delays.
+  /// Enables delay-agnostic echo cancellation. This feature relies on
+  /// internally estimated delays between the process and reverse streams, thus
+  /// not relying on reported system delays.
   /// </div>
   bool enable_delay_agnostic;
 
@@ -96,25 +101,25 @@ struct GainControl {
 
   /// <div rustbindgen>Mode of gain control.</div>
   enum Mode {
-      /// <div rustbindgen>Not supported yet.</div>
-      /// TODO(skywhale): Expose set_stream_analog_level() and
-      /// stream_analog_level().
-      ADAPTIVE_ANALOG,
+    /// <div rustbindgen>Not supported yet.</div>
+    /// TODO(skywhale): Expose set_stream_analog_level() and
+    /// stream_analog_level().
+    ADAPTIVE_ANALOG,
 
-      /// <div rustbindgen>
-      /// Bring the signal to an appropriate range by applying an adaptive gain
-      /// control. The volume is dynamically amplified with a microphone with
-      /// small pickup and vice versa.
-      /// </div>
-      ADAPTIVE_DIGITAL,
+    /// <div rustbindgen>
+    /// Bring the signal to an appropriate range by applying an adaptive gain
+    /// control. The volume is dynamically amplified with a microphone with
+    /// small pickup and vice versa.
+    /// </div>
+    ADAPTIVE_DIGITAL,
 
-      /// <div rustbindgen>
-      /// Unlike ADAPTIVE_DIGITAL, it only compresses (i.e. gradually reduces
-      /// gain with increasing level) the input signal when at higher levels.
-      /// Use this where the capture signal level is predictable, so that a
-      /// known gain can be applied.
-      /// </div>
-      FIXED_DIGITAL,
+    /// <div rustbindgen>
+    /// Unlike ADAPTIVE_DIGITAL, it only compresses (i.e. gradually reduces
+    /// gain with increasing level) the input signal when at higher levels.
+    /// Use this where the capture signal level is predictable, so that a
+    /// known gain can be applied.
+    /// </div>
+    FIXED_DIGITAL,
   };
 
   /// <div rustbindgen>Determines what type of gain control is applied.</div>
@@ -150,15 +155,15 @@ struct NoiseSuppression {
 
   /// <div rustbindgen>A level of noise suppression.</div>
   enum SuppressionLevel {
-      LOW,
-      MODERATE,
-      HIGH,
-      VERY_HIGH,
+    LOW,
+    MODERATE,
+    HIGH,
+    VERY_HIGH,
   };
 
   /// <div rustbindgen>
-  /// Determines the aggressiveness of the suppression. Increasing the level will
-  /// reduce the noise level at the expense of a higher speech distortion.
+  /// Determines the aggressiveness of the suppression. Increasing the level
+  /// will reduce the noise level at the expense of a higher speech distortion.
   /// </div>
   SuppressionLevel suppression_level;
 };
@@ -170,10 +175,10 @@ struct VoiceDetection {
 
   /// <div rustbindgen>The sensitivity of the noise detector.</div>
   enum DetectionLikelihood {
-      VERY_LOW,
-      LOW,
-      MODERATE,
-      HIGH,
+    VERY_LOW,
+    LOW,
+    MODERATE,
+    HIGH,
   };
 
   /// <div rustbindgen>
@@ -211,16 +216,16 @@ struct Stats {
   OptionalBool has_voice;
 
   /// <div rustbindgen>
-  /// False if the current frame almost certainly contains no echo and true if it
-  /// _might_ contain echo.
+  /// False if the current frame almost certainly contains no echo and true if
+  /// it _might_ contain echo.
   /// </div>
   OptionalBool has_echo;
 
   /// <div rustbindgen>
-  /// Root mean square (RMS) level in dBFs (decibels from digital full-scale), or
-  /// alternately dBov. It is computed over all primary stream frames since the
-  /// last call to |get_stats()|. The returned value is constrained to [-127, 0],
-  /// where -127 indicates muted.
+  /// Root mean square (RMS) level in dBFs (decibels from digital full-scale),
+  /// or alternately dBov. It is computed over all primary stream frames since
+  /// the last call to |get_stats()|. The returned value is constrained to
+  /// [-127, 0], where -127 indicates muted.
   /// </div>
   OptionalInt rms_dbfs;
 
@@ -259,49 +264,63 @@ struct Stats {
 
   /// <div rustbindgen>
   /// Standard deviation of the measured delay in ms. The values are aggregated
-  /// until the first call to |get_stats()| and afterwards aggregated and updated
-  /// every second.
+  /// until the first call to |get_stats()| and afterwards aggregated and
+  /// updated every second.
   /// </div>
   OptionalInt delay_standard_deviation_ms;
 
   /// <div rustbindgen>
-  /// The fraction of delay estimates that can make the echo cancellation perform
-  /// poorly.
+  /// The fraction of delay estimates that can make the echo cancellation
+  /// perform poorly.
   /// </div>
   OptionalDouble delay_fraction_poor_delays;
 };
 
 // Creates a new instance of the signal processor.
-AudioProcessing* audio_processing_create(const InitializationConfig& init_config, int* error);
+AudioProcessing *
+audio_processing_create(const InitializationConfig &init_config, int *error);
 
 // Processes and modifies the audio frame from a capture device. Each element in
 // |channels| is an array of float representing a single-channel frame of 10 ms
 // length. Returns an error code or |kNoError|.
-int process_capture_frame(AudioProcessing* ap, float** channels);
+int process_capture_frame(AudioProcessing *ap, float **channels);
 
 // Processes and optionally modifies the audio frame from a playback device.
 // Each element in |channels| is an array of float representing a single-channel
 // frame of 10 ms length. Returns an error code or |kNoError|.
-int process_render_frame(AudioProcessing* ap, float** channel3);
+int process_render_frame(AudioProcessing *ap, float **channel3);
 
 // Returns statistics from the last |process_capture_frame()| call.
-Stats get_stats(AudioProcessing* ap);
+Stats get_stats(AudioProcessing *ap);
 
 // Immediately updates the configurations of the signal processor.
 // May be called multiple times after the initialization and during processing.
-void set_config(AudioProcessing* ap, const Config& config);
+void set_config(AudioProcessing *ap, const Config &config);
 
 // Signals the AEC and AGC that the audio output will be / is muted.
 // They may use the hint to improve their parameter adaptation.
-void set_output_will_be_muted(AudioProcessing* ap, bool muted);
+void set_output_will_be_muted(AudioProcessing *ap, bool muted);
 
 // Every processor created by |audio_processing_create()| needs to destroyed by
 // this function.
-void audio_processing_delete(AudioProcessing* ap);
+void audio_processing_delete(AudioProcessing *ap);
 
 // Returns true iff the code indicates a successful operation.
 bool is_success(int code);
 
-}  // namespace webrtc_audio_processing
+struct FVad;
 
-#endif  // WEBRTC_AUDIO_PROCESSING_WRAPPER_HPP_
+enum Aggressiveness {
+  kVadNormal = 0,
+  kVadLowBitrate = 1,
+  kVadAggressive = 2,
+  kVadVeryAggressive = 3
+};
+
+FVad *fvad_create(Aggressiveness aggressiveness);
+int fvad_process(FVad *fvad, const int16_t *audio, size_t num_samples);
+void fvad_delete(FVad *fvad);
+
+} // namespace webrtc_audio_processing
+
+#endif // WEBRTC_AUDIO_PROCESSING_WRAPPER_HPP_
