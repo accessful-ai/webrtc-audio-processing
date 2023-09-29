@@ -65,8 +65,9 @@ mod webrtc {
         let meson_output = meson_cmd.output()?;
         if !meson_output.status.success() {
             return Err(failure::format_err!(
-                "Meson build failed {}",
+                "Meson build failed {} {}",
                 std::str::from_utf8(meson_output.stderr.as_slice())?,
+                std::str::from_utf8(meson_output.stdout.as_slice())?,
             ));
         }
 
