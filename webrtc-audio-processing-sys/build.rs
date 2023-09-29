@@ -2,7 +2,7 @@ use failure::Error;
 use regex::Regex;
 use std::{
     env,
-    fs::File,
+    fs::{create_dir, File},
     io::{Read, Write},
     path::{Path, PathBuf},
 };
@@ -45,27 +45,69 @@ mod webrtc {
     }
 
     pub(super) fn build_if_necessary() -> Result<(), Error> {
+        // Copy source to the output directory (build_dir)
         let build_dir = copy_source_to_out_dir()?;
 
-        if cfg!(target_os = "macos") {
-            run_command(&build_dir, "glibtoolize", None)?;
-        } else {
-            run_command(&build_dir, "libtoolize", None)?;
+        // Run Meson for building the dependency
+        let meson_build_dir = build_dir.join("build");
+        if !meson_build_dir.is_dir() {
+            create_dir(&meson_build_dir)?;
+        }
+        let mut meson_cmd = std::process::Command::new("meson");
+        //meson_cmd.current_dir(&build_dir);
+        meson_cmd.current_dir(&meson_build_dir);
+        meson_cmd.arg(format!("--prefix=/"));
+
+        let meson_output = meson_cmd.output()?;
+        if !meson_output.status.success() {
+            return Err(failure::format_err!("Meson build failed"));
         }
 
-        run_command(&build_dir, "aclocal", None)?;
-        run_command(&build_dir, "automake", Some(&["--add-missing", "--copy"]))?;
-        run_command(&build_dir, "autoconf", None)?;
+        // Build the project using Ninja (you can use another build system if needed)
+        let mut ninja_cmd = std::process::Command::new("ninja");
+        ninja_cmd.current_dir(&meson_build_dir);
 
-        autotools::Config::new(build_dir)
-            .cflag("-fPIC")
-            .cxxflag("-fPIC")
-            .disable_shared()
-            .enable_static()
-            .build();
-
+        let ninja_output = ninja_cmd.output()?;
+        if !ninja_output.status.success() {
+            return Err(failure::format_err!("Ninja build failed"));
+        }
+        // Optionally, you can install the built files into the system
+        println!("BUILD IF NECESSARY2");
+        let mut install_cmd = std::process::Command::new("ninja");
+        install_cmd.current_dir(&meson_build_dir);
+        install_cmd.env("DESTDIR", build_dir);
+        install_cmd.arg("install");
+        let install_output = install_cmd.output()?;
+        if !install_output.status.success() {
+            return Err(failure::format_err!(
+                "Installation failed: {}",
+                std::str::from_utf8(install_output.stderr.as_slice())?,
+            ));
+        }
         Ok(())
     }
+    // pub(super) fn build_if_necessary() -> Result<(), Error> {
+    //     let build_dir = copy_source_to_out_dir()?;
+
+    //     if cfg!(target_os = "macos") {
+    //         run_command(&build_dir, "glibtoolize", None)?;
+    //     } else {
+    //         run_command(&build_dir, "libtoolize", None)?;
+    //     }
+
+    //     run_command(&build_dir, "aclocal", None)?;
+    //     run_command(&build_dir, "automake", Some(&["--add-missing", "--copy"]))?;
+    //     run_command(&build_dir, "autoconf", None)?;
+
+    //     autotools::Config::new(build_dir)
+    //         .cflag("-fPIC")
+    //         .cxxflag("-fPIC")
+    //         .disable_shared()
+    //         .enable_static()
+    //         .build();
+
+    //     Ok(())
+    // }
 
     fn run_command<P: AsRef<Path>>(
         curr_dir: P,
