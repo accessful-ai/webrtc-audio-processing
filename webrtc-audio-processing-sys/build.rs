@@ -21,7 +21,11 @@ mod webrtc {
 
     pub(super) fn get_build_paths() -> Result<(PathBuf, PathBuf), Error> {
         let include_path = out_dir().join(BUNDLED_SOURCE_PATH);
-        let lib_path = out_dir().join("webrtc-audio-processing").join("lib");
+        let lib_path = if cfg!(target_os = "windows") {
+            out_dir().join(BUNDLED_SOURCE_PATH).join("build").join("webrtc")
+        } else {
+            out_dir().join("webrtc-audio-processing").join("lib")
+        };
         Ok((include_path, lib_path))
     }
 
@@ -37,6 +41,7 @@ mod webrtc {
         }
 
         let out_dir = out_dir();
+        println!("Out dir : {}", out_dir.display());
         let mut options = CopyOptions::new();
         options.overwrite = true;
         let cwd = env::current_dir()?;
@@ -47,7 +52,7 @@ mod webrtc {
         Ok(out_dir.join(BUNDLED_SOURCE_PATH))
     }
 
-    pub(super) fn build_if_necessary() -> Result<(), Error> {
+    pub(super) fn build() -> Result<(), Error> {
         // Copy source to the output directory (build_dir)
         let build_dir = copy_source_to_out_dir()?;
 
@@ -59,8 +64,13 @@ mod webrtc {
         let mut meson_cmd = std::process::Command::new("meson");
         //meson_cmd.current_dir(&build_dir);
         meson_cmd.current_dir(&meson_build_dir);
+        meson_cmd.arg(format!("setup"));
+        meson_cmd.arg(format!(".."));
         meson_cmd.arg(format!("--prefix=/"));
         meson_cmd.arg(format!("-Ddefault_library=static"));
+        if cfg!(target_os = "windows") {
+            meson_cmd.arg(format!("--backend=vs"));
+        }
 
         let meson_output = meson_cmd.output()?;
         if !meson_output.status.success() {
@@ -71,28 +81,43 @@ mod webrtc {
             ));
         }
 
-        // Build the project using Ninja (you can use another build system if needed)
-        let mut ninja_cmd = std::process::Command::new("ninja");
-        ninja_cmd.current_dir(&meson_build_dir);
+        if !cfg!(target_os = "windows") {
+            // Build the project using Ninja (you can use another build system if needed)
+            let mut ninja_cmd = std::process::Command::new("ninja");
+            ninja_cmd.current_dir(&meson_build_dir);
 
-        let ninja_output = ninja_cmd.output()?;
-        if !ninja_output.status.success() {
-            return Err(failure::format_err!(
-                "Ninja build failed: {}",
-                std::str::from_utf8(ninja_output.stderr.as_slice())?
-            ));
-        }
-        // Optionally, you can install the built files into the system
-        let mut install_cmd = std::process::Command::new("ninja");
-        install_cmd.current_dir(&meson_build_dir);
-        install_cmd.env("DESTDIR", build_dir);
-        install_cmd.arg("install");
-        let install_output = install_cmd.output()?;
-        if !install_output.status.success() {
-            return Err(failure::format_err!(
-                "Installation failed: {}",
-                std::str::from_utf8(install_output.stderr.as_slice())?,
-            ));
+            let ninja_output = ninja_cmd.output()?;
+            if !ninja_output.status.success() {
+                return Err(failure::format_err!(
+                    "Ninja build failed: {}",
+                    std::str::from_utf8(ninja_output.stderr.as_slice())?
+                ));
+            }
+            // Optionally, you can install the built files into the system
+            let mut install_cmd = std::process::Command::new("ninja");
+            install_cmd.current_dir(&meson_build_dir);
+            install_cmd.env("DESTDIR", build_dir);
+            install_cmd.arg("install");
+            let install_output = install_cmd.output()?;
+            if !install_output.status.success() {
+                return Err(failure::format_err!(
+                    "Installation failed: {}",
+                    std::str::from_utf8(install_output.stderr.as_slice())?,
+                ));
+            }
+        } else {
+            println!("MSBUILD starting");
+            let mut build_cmd = std::process::Command::new("msbuild");
+            build_cmd.current_dir(&meson_build_dir);
+            build_cmd.arg(".\\webrtc-audio-processing.sln");
+            let build_output = build_cmd.output()?;
+            if !build_output.status.success() {
+                return Err(failure::format_err!(
+                    "msbuild failed: {} {}",
+                    std::str::from_utf8(build_output.stderr.as_slice())?,
+                    std::str::from_utf8(build_output.stdout.as_slice())?,
+                ));
+            }
         }
         Ok(())
     }
@@ -117,7 +142,7 @@ fn derive_serde(binding_file: &Path) -> Result<(), Error> {
 }
 
 fn main() -> Result<(), Error> {
-    webrtc::build_if_necessary()?;
+    webrtc::build()?;
     let (webrtc_include, webrtc_lib) = webrtc::get_build_paths()?;
 
     let mut cc_build = cc::Build::new();
