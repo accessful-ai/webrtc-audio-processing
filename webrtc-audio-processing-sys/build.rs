@@ -28,6 +28,7 @@ mod webrtc {
     fn copy_source_to_out_dir() -> Result<PathBuf, Error> {
         use fs_extra::dir::CopyOptions;
 
+        println!("Bundle path: {}", BUNDLED_SOURCE_PATH);
         if Path::new(BUNDLED_SOURCE_PATH).read_dir()?.next().is_none() {
             eprintln!("The webrtc-audio-processing source directory is empty.");
             eprintln!("See the crate README for installation instructions.");
