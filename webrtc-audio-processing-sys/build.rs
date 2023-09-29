@@ -21,7 +21,7 @@ mod webrtc {
 
     pub(super) fn get_build_paths() -> Result<(PathBuf, PathBuf), Error> {
         let include_path = out_dir().join(BUNDLED_SOURCE_PATH);
-        let lib_path = out_dir().join("lib");
+        let lib_path = out_dir().join("webrtc-audio-processing").join("lib");
         Ok((include_path, lib_path))
     }
 
@@ -59,6 +59,7 @@ mod webrtc {
         //meson_cmd.current_dir(&build_dir);
         meson_cmd.current_dir(&meson_build_dir);
         meson_cmd.arg(format!("--prefix=/"));
+        meson_cmd.arg(format!("-Ddefault_library=static"));
 
         let meson_output = meson_cmd.output()?;
         if !meson_output.status.success() {
@@ -86,53 +87,6 @@ mod webrtc {
                 std::str::from_utf8(install_output.stderr.as_slice())?,
             ));
         }
-        Ok(())
-    }
-    // pub(super) fn build_if_necessary() -> Result<(), Error> {
-    //     let build_dir = copy_source_to_out_dir()?;
-
-    //     if cfg!(target_os = "macos") {
-    //         run_command(&build_dir, "glibtoolize", None)?;
-    //     } else {
-    //         run_command(&build_dir, "libtoolize", None)?;
-    //     }
-
-    //     run_command(&build_dir, "aclocal", None)?;
-    //     run_command(&build_dir, "automake", Some(&["--add-missing", "--copy"]))?;
-    //     run_command(&build_dir, "autoconf", None)?;
-
-    //     autotools::Config::new(build_dir)
-    //         .cflag("-fPIC")
-    //         .cxxflag("-fPIC")
-    //         .disable_shared()
-    //         .enable_static()
-    //         .build();
-
-    //     Ok(())
-    // }
-
-    fn run_command<P: AsRef<Path>>(
-        curr_dir: P,
-        cmd: &str,
-        args_opt: Option<&[&str]>,
-    ) -> Result<(), Error> {
-        let mut command = std::process::Command::new(cmd);
-
-        command.current_dir(curr_dir);
-
-        if let Some(args) = args_opt {
-            command.args(args);
-        }
-
-        let _output = command.output().map_err(|e| {
-            failure::format_err!(
-                "Error running command '{}' with args '{:?}' - {:?}",
-                cmd,
-                args_opt,
-                e
-            )
-        })?;
-
         Ok(())
     }
 }
