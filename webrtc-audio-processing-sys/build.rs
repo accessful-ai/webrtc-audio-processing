@@ -70,7 +70,10 @@ mod webrtc {
         meson_cmd.arg(format!("-Ddefault_library=static"));
         if cfg!(target_os = "windows") {
             meson_cmd.arg(format!("--backend=vs"));
+        } else {
+            meson_cmd.arg(format!("--backend=ninja"));
         }
+        println!("Running command: {:?}", meson_cmd);
 
         let meson_output = meson_cmd.output()?;
         if !meson_output.status.success() {
