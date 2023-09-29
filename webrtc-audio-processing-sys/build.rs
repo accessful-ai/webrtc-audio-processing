@@ -39,9 +39,10 @@ mod webrtc {
         let out_dir = out_dir();
         let mut options = CopyOptions::new();
         options.overwrite = true;
-
-        println!("Copy from {} to {}", BUNDLED_SOURCE_PATH, out_dir.display());
-        fs_extra::dir::copy(BUNDLED_SOURCE_PATH, &out_dir, &options)?;
+        let cwd = env::current_dir()?;
+        let source = cwd.join(BUNDLED_SOURCE_PATH);
+        println!("Copy from {} to {}", source.display(), out_dir.display());
+        fs_extra::dir::copy(source, &out_dir, &options)?;
 
         Ok(out_dir.join(BUNDLED_SOURCE_PATH))
     }
