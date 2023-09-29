@@ -64,7 +64,10 @@ mod webrtc {
 
         let meson_output = meson_cmd.output()?;
         if !meson_output.status.success() {
-            return Err(failure::format_err!("Meson build failed"));
+            return Err(failure::format_err!(
+                "Meson build failed {}",
+                std::str::from_utf8(meson_output.stderr.as_slice())?,
+            ));
         }
 
         // Build the project using Ninja (you can use another build system if needed)
