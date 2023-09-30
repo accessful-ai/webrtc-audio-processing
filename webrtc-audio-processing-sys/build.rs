@@ -92,8 +92,9 @@ mod webrtc {
             let ninja_output = ninja_cmd.output()?;
             if !ninja_output.status.success() {
                 return Err(failure::format_err!(
-                    "Ninja build failed: {}",
+                    "Ninja build failed: {} {}",
                     std::str::from_utf8(ninja_output.stderr.as_slice())?
+                    std::str::from_utf8(ninja_output.stdout.as_slice())?
                 ));
             }
             // Optionally, you can install the built files into the system
