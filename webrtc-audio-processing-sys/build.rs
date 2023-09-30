@@ -93,8 +93,8 @@ mod webrtc {
             if !ninja_output.status.success() {
                 return Err(failure::format_err!(
                     "Ninja build failed: {} {}",
-                    std::str::from_utf8(ninja_output.stderr.as_slice())?
-                    std::str::from_utf8(ninja_output.stdout.as_slice())?
+                    std::str::from_utf8(ninja_output.stderr.as_slice())?,
+                    std::str::from_utf8(ninja_output.stdout.as_slice())?,
                 ));
             }
             // Optionally, you can install the built files into the system
@@ -105,8 +105,9 @@ mod webrtc {
             let install_output = install_cmd.output()?;
             if !install_output.status.success() {
                 return Err(failure::format_err!(
-                    "Installation failed: {}",
+                    "Installation failed: {} {}",
                     std::str::from_utf8(install_output.stderr.as_slice())?,
+                    std::str::from_utf8(install_output.stdout.as_slice())?,
                 ));
             }
         } else {
