@@ -239,16 +239,20 @@ bool is_success(const int code) {
   return code == webrtc::AudioProcessing::kNoError;
 }
 
-struct FVad {
-  rtc::scoped_ptr<webrtc::Vad> vad;
+class FVad {
+public:
+  FVad(int sample_rate, rtc::scoped_ptr<webrtc::Vad> vad_)
+      : sample_rate(sample_rate), vad(std::move(vad_)) {}
+
   int sample_rate;
+  rtc::scoped_ptr<webrtc::Vad> vad;
 };
 
 FVad *fvad_create(Aggressiveness aggressiveness) {
-  return new FVad{
-    vad : webrtc::CreateVad(webrtc::Vad::Aggressiveness(aggressiveness)),
-    sample_rate : 16000
-  };
+  rtc::scoped_ptr<webrtc::Vad> vad =
+      webrtc::CreateVad(webrtc::Vad::Aggressiveness(aggressiveness));
+  FVad *fvad = new FVad(16000, std::move(vad));
+  return fvad;
 }
 
 int fvad_process(FVad *fvad, const int16_t *audio, size_t num_samples) {

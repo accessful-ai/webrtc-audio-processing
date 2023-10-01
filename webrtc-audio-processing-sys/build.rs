@@ -1,13 +1,18 @@
 use failure::Error;
 use regex::Regex;
+use reqwest;
 use std::{
     env,
     fs::{create_dir, File},
-    io::{Read, Write},
+    io::{Cursor, Read, Write},
     path::{Path, PathBuf},
 };
 
 const DEPLOYMENT_TARGET_VAR: &str = "MACOSX_DEPLOYMENT_TARGET";
+const GITHUB_REPO_OWNER: &str = "wuurrd";
+const GITHUB_REPO_NAME: &str = "webrtc-audio-processing";
+const RELEASE_TAG: &str = "v0.1.0";
+const ASSET_NAME: &str = "webrtc-Windows.zip";
 
 fn out_dir() -> PathBuf {
     std::env::var("OUT_DIR").expect("OUT_DIR environment var not set.").into()
@@ -19,10 +24,67 @@ mod webrtc {
 
     const BUNDLED_SOURCE_PATH: &str = "./webrtc-audio-processing";
 
+    use zip::read::ZipArchive;
+
+    fn unzip_asset(asset_path: &str, destination_path: &str) -> Result<(), Error> {
+        let file = File::open(asset_path)?;
+        let mut archive = ZipArchive::new(file)?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+
+            // Construct the output path for the file.
+            let outpath = format!("{}\\{}", destination_path, file.name());
+            if !file.name().ends_with(".a") && !file.name().ends_with(".pdb") {
+                continue;
+            }
+
+            if file.is_dir() {
+                std::fs::create_dir_all(&outpath)?;
+            } else {
+                if let Some(p) = outpath.rfind('\\') {
+                    if p > 0 {
+                        std::fs::create_dir_all(&outpath[0..p])?;
+                    }
+                }
+                println!("Creating file: {}", &outpath);
+                let mut outfile = File::create(&outpath)?;
+                std::io::copy(&mut file, &mut outfile)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn download_asset() -> Result<(), Error> {
+        let asset_url = format!(
+            "https://github.com/{}/{}/releases/download/{}/{}",
+            GITHUB_REPO_OWNER, GITHUB_REPO_NAME, RELEASE_TAG, ASSET_NAME
+        );
+
+        let response = reqwest::blocking::get(&asset_url).expect("Failed to download the asset");
+
+        if response.status() != 200 {
+            panic!("Failed to download the asset: {}", response.status());
+        }
+
+        let mut asset_file = File::create(ASSET_NAME).expect("Failed to create the asset file");
+        let mut content = Cursor::new(response.bytes()?);
+        std::io::copy(&mut content, &mut asset_file).expect("Failed to save the asset");
+        let lib_dir = out_dir().join("webrtc-audio-processing").join("lib");
+        let lib_dir_str =
+            lib_dir.to_str().ok_or(failure::format_err!("Can not create_lib_dir_str"))?;
+        if !lib_dir.is_dir() {
+            std::fs::create_dir_all(lib_dir_str)?;
+        }
+        unzip_asset(ASSET_NAME, lib_dir_str)?;
+        Ok(())
+    }
+
     pub(super) fn get_build_paths() -> Result<(PathBuf, PathBuf), Error> {
         let include_path = out_dir().join(BUNDLED_SOURCE_PATH);
         let lib_path = if cfg!(target_os = "windows") {
-            out_dir().join(BUNDLED_SOURCE_PATH).join("build").join("webrtc")
+            out_dir().join("webrtc-audio-processing").join("lib").join("webrtc")
         } else {
             out_dir().join("webrtc-audio-processing").join("lib")
         };
@@ -46,12 +108,32 @@ mod webrtc {
         options.overwrite = true;
         let cwd = env::current_dir()?;
         let source = cwd.join(BUNDLED_SOURCE_PATH);
-        println!("Copy from {} to {}", source.display(), out_dir.display());
+        let path = out_dir.join("webrtc-audio-processing");
+
+        println!(
+            "Copy from {} to {}, exists: {}",
+            source.display(),
+            out_dir.display(),
+            path.is_dir(),
+        );
+        if path.is_dir() {
+            // If the source directory exists, we delete it
+            std::fs::remove_dir_all(&path)?;
+        }
         fs_extra::dir::copy(source, &out_dir, &options)?;
+        println!("Copied");
 
         Ok(out_dir.join(BUNDLED_SOURCE_PATH))
     }
 
+    #[cfg(target_os = "windows")]
+    pub(super) fn build() -> Result<(), Error> {
+        copy_source_to_out_dir()?;
+        download_asset()?;
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
     pub(super) fn build() -> Result<(), Error> {
         // Copy source to the output directory (build_dir)
         let build_dir = copy_source_to_out_dir()?;
@@ -89,6 +171,7 @@ mod webrtc {
             let mut ninja_cmd = std::process::Command::new("ninja");
             ninja_cmd.current_dir(&meson_build_dir);
 
+            println!("Running ninja: {:?} in dir: {}", ninja_cmd, meson_build_dir.display());
             let ninja_output = ninja_cmd.output()?;
             if !ninja_output.status.success() {
                 return Err(failure::format_err!(
@@ -171,22 +254,36 @@ fn main() -> Result<(), Error> {
         cc_build.flag(&format!("-mmacos-version-min={}", min_version));
     }
 
-    cc_build
+    let mut b = cc_build
         .cpp(true)
         .file("src/wrapper.cpp")
         .include(&webrtc_include)
-        .flag("-Wno-unused-parameter")
-        .flag("-Wno-deprecated-declarations")
-        .flag("-std=c++11")
-        .out_dir(&out_dir())
-        .compile("webrtc_audio_processing_wrapper");
+        .flag_if_supported("-Wno-unused-parameter")
+        .flag_if_supported("-Wno-deprecated-declarations")
+        .flag_if_supported("-std=c++11");
+
+    #[cfg(target_os = "windows")]
+    {
+        b.define("WEBRTC_WIN", None);
+        b.define("_WIN32", None);
+        b.define("__STRICT_ANSI__", None);
+        b.define("_WINSOCKAPI_", None);
+        b.define("NOMINMAX", None);
+        b.define("_USE_MATH_DEFINES", None);
+    }
+
+    b.out_dir(&out_dir()).compile("webrtc_audio_processing_wrapper");
 
     println!("cargo:rustc-link-search=native={}", webrtc_lib.display());
     println!("cargo:rustc-link-lib=static=webrtc_audio_processing_wrapper");
 
     println!("cargo:rerun-if-env-changed={}", DEPLOYMENT_TARGET_VAR);
 
-    println!("cargo:rustc-link-lib=static=webrtc_audio_processing");
+    if cfg!(target_os = "windows") {
+        println!("cargo:rustc-link-lib=static=webrtc");
+    } else {
+        println!("cargo:rustc-link-lib=static=webrtc_audio_processing");
+    }
 
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=dylib=c++");

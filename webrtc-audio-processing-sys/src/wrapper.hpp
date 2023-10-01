@@ -308,7 +308,7 @@ void audio_processing_delete(AudioProcessing *ap);
 // Returns true iff the code indicates a successful operation.
 bool is_success(int code);
 
-struct FVad;
+class FVad;
 
 enum Aggressiveness {
   kVadNormal = 0,
