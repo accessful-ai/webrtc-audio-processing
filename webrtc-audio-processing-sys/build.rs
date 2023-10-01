@@ -287,7 +287,7 @@ fn main() -> Result<(), Error> {
 
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=dylib=c++");
-    } else {
+    } else if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-lib=dylib=stdc++");
     }
 
