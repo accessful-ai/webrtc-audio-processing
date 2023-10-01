@@ -84,7 +84,12 @@ mod webrtc {
     pub(super) fn get_build_paths() -> Result<(PathBuf, PathBuf), Error> {
         let include_path = out_dir().join(BUNDLED_SOURCE_PATH);
         let lib_path = if cfg!(target_os = "windows") {
-            out_dir().join("webrtc-audio-processing").join("lib").join("webrtc")
+            out_dir()
+                .join("webrtc-audio-processing")
+                .join("lib")
+                .join("webrtc")
+                .join("modules")
+                .join("audio_processing")
         } else {
             out_dir().join("webrtc-audio-processing").join("lib")
         };
@@ -279,11 +284,7 @@ fn main() -> Result<(), Error> {
 
     println!("cargo:rerun-if-env-changed={}", DEPLOYMENT_TARGET_VAR);
 
-    if cfg!(target_os = "windows") {
-        println!("cargo:rustc-link-lib=static=webrtc");
-    } else {
-        println!("cargo:rustc-link-lib=static=webrtc_audio_processing");
-    }
+    println!("cargo:rustc-link-lib=static=webrtc_audio_processing");
 
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=dylib=c++");
