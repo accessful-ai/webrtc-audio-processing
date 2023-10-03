@@ -11,7 +11,7 @@ use std::{
 const DEPLOYMENT_TARGET_VAR: &str = "MACOSX_DEPLOYMENT_TARGET";
 const GITHUB_REPO_OWNER: &str = "wuurrd";
 const GITHUB_REPO_NAME: &str = "webrtc-audio-processing";
-const RELEASE_TAG: &str = "v0.1.0";
+const RELEASE_TAG: &str = "v0.2.0";
 const ASSET_NAME: &str = "webrtc-Windows.zip";
 
 fn out_dir() -> PathBuf {
